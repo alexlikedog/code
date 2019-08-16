@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:aop="http://www.springframework.org/schema/aop"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans 
+       http://www.springframework.org/schema/beans/spring-beans.xsd
+       http://www.springframework.org/schema/aop
+       http://www.springframework.org/schema/aop/spring-aop.xsd">
+    
+    <!-- 配置整合mybatis-->
+    <bean id="propertyConfigurer" class="org.springframework.beans.factory.config.PropertyPlaceholderConfigurer">
+        <property name="locations">
+            <list>
+                <value>classpath*:jdbc.properties</value>
+            </list>
+        </property>
+    </bean>
+    <!--配置数据库的连接池-->
+    <bean id="abstractDataSource" class="com.alibaba.druid.pool.DruidDataSource">
+        <property name="driverClassName" value="${jdbc_driver}"></property>
+        <!-- 配置初始化大小、最小、最大 -->
+        <property name="initialSize" value="5" />
+        <property name="minIdle" value="5" />
+        <property name="maxActive" value="10" />
+        <!-- 配置从连接池获取连接等待超时的时间 -->
+        <property name="maxWait" value="10000" />
+    </bean>
+    <!--多数据源配置 parent指向上面的配置数据库的连接池abstractDataSource 这里配置了两个数据源-->
+    <bean id="dataSource1" parent="abstractDataSource">
+        <property name="url" value="${jdbc_url}" />
+        <property name="username" value="${jdbc_user}" />
+        <property name="password" value="${jdbc_password}" />
+    </bean>
+    <bean id="dataSource2" parent="abstractDataSource">
+        <property name="url" value="${jdbc_url_s}" />
+        <property name="username" value="${jdbc_user_s}" />
+        <property name="password" value="${jdbc_password_s}" />
+    </bean>
+    
+    <!-- 在RoutingDataSource类中读取 当前的返回值 并匹配key值 选择你的数据库源-->
+    <bean id="dataSource" class="com.alex.dao.RoutingDataSource">
+        <property name="targetDataSources">
+            <map key-type="java.lang.String">
+                <entry key="dataSource1" value-ref="dataSource1"></entry>
+                <entry key="dataSource2" value-ref="dataSource2"></entry>
+            </map>
+        </property>
+        <property name="defaultTargetDataSource" ref="dataSource1"></property>
+    </bean>
+
+    <bean id="sqlSessionFactory" class="org.mybatis.spring.SqlSessionFactoryBean">
+        <!-- 数据源 -->
+        <property name="dataSource" ref="dataSource"></property>
+        <!-- 别名 -->
+        <property name="typeAliasesPackage" value="com.alex.entity"></property>
+        <!-- sql映射文件路径 -->
+        <property name="mapperLocations" value="classpath*:mapping/*Mapper.xml"></property>
+    </bean>
+
+    <!--4 自动扫描对象关系映射 -->
+    <bean class="org.mybatis.spring.mapper.MapperScannerConfigurer">
+        <!--指定会话工厂，如果当前上下文中只定义了一个则该属性可省去 -->
+        <property name="sqlSessionFactoryBeanName" value="sqlSessionFactory"></property>
+        <!-- 指定要自动扫描接口的基础包，实现接口 -->
+        <property name="basePackage" value="com.alex.mapper"></property>
+    </bean>
+
+    <!-- 启动@aspectj的自动代理支持-->
+    <aop:aspectj-autoproxy expose-proxy="true"></aop:aspectj-autoproxy>
+    <!-- 定义aspect类 -->
+    <bean id="dataSourceAspect" class="com.alex.aop.DataSourceAspect"></bean>
+    
+    <bean id="userSerice" class="com.alex.service.UserService" autowire="byType" ></bean>
+</beans>
